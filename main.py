@@ -90,8 +90,3 @@ async def on_ready():
     server_on()
 
 client.run(os.getenv('TOKEN'))
-client.loop.create_task(send_exchange_rate())
-
-server_on()
-
-client.run(os.getenv('TOKEN'))
