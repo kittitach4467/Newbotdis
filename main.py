@@ -2,15 +2,17 @@ import os
 import discord
 import asyncio
 import yfinance as yf
-
 from datetime import datetime, time, timedelta
-
 from myserver import server_on
 
 # ตั้งค่า token ของบอทที่นี่
 CHANNEL_ID = '1281951649845477418'  # ID ของ channel ที่จะให้บอทส่งข้อความ
 
-client = discord.Client()
+# กำหนด intents เพื่อเปิดใช้งานฟีเจอร์ต่าง ๆ
+intents = discord.Intents.default()
+intents.message_content = True  # เปิดการเข้าถึงข้อความ
+
+client = discord.Client(intents=intents)
 
 # ฟังก์ชันคำนวณเวลาที่เหลือก่อนถึงช่วงเวลาที่ต้องการส่งข้อมูล
 def time_until_next_target(target_time):
@@ -18,20 +20,20 @@ def time_until_next_target(target_time):
     target = now.replace(hour=target_time.hour, minute=target_time.minute, second=0, microsecond=0)
     
     if now > target:
-        target = target.replace(day=now.day + 1)  # ถ้าเวลาปัจจุบันเกินเป้าหมาย ให้เลื่อนไปส่งวันถัดไป
+        target += timedelta(days=1)  # ถ้าเวลาปัจจุบันเกินเป้าหมาย ให้เลื่อนไปส่งวันถัดไป
     return (target - now).total_seconds()
 
 async def send_exchange_rate():
     await client.wait_until_ready()
     channel = client.get_channel(int(CHANNEL_ID))
-    times_to_send = [time(hour=h, minute=m) for h in range(0, 24) for m in range(0, 60, 1)]  # กำหนดเวลาที่จะส่ง
+    times_to_send = [time(hour=h, minute=m) for h in range(0, 24) for m in range(0, 60)]  # กำหนดเวลาที่จะส่งทุกนาที
 
     while not client.is_closed():
         now = datetime.now().time()
 
-        # ตรวจสอบว่าเวลาปัจจุบันตรงกับหนึ่งในเวลาที่ต้องการส่งหรือไม่
+        # ตรวจสอบว่าเวลาปัจจุบันตรงกับเวลาที่ต้องการส่งหรือไม่
         for target_time in times_to_send:
-            if now >= target_time and now < (datetime.combine(datetime.today(), target_time) + timedelta(minutes=1)).time():
+            if now.hour == target_time.hour and now.minute == target_time.minute:
                 try:
                     # ดึงข้อมูลจาก yfinance สำหรับค่าเงิน USD/THB
                     data = yf.download('USDTHB=X', period='1d', interval='1m')
@@ -39,21 +41,21 @@ async def send_exchange_rate():
                     
                     # ดึงวันที่และเวลาปัจจุบัน
                     days_of_week = {
-                    'Monday': 'วันจันทร์',
-                    'Tuesday': 'วันอังคาร',
-                    'Wednesday': 'วันพุธ',
-                    'Thursday': 'วันพฤหัสบดี',
-                    'Friday': 'วันศุกร์',
-                    'Saturday': 'วันเสาร์',
-                    'Sunday': 'วันอาทิตย์'
+                        'Monday': 'วันจันทร์',
+                        'Tuesday': 'วันอังคาร',
+                        'Wednesday': 'วันพุธ',
+                        'Thursday': 'วันพฤหัสบดี',
+                        'Friday': 'วันศุกร์',
+                        'Saturday': 'วันเสาร์',
+                        'Sunday': 'วันอาทิตย์'
                     }
                     now = datetime.now()
-                    day_of_week_eng = now.strftime('%A')
-                    day_of_week_th = days_of_week.get(day_of_week_eng, day_of_week_eng)
+                    day_of_week_th = days_of_week.get(now.strftime('%A'), 'Unknown')
 
-                    now_str = datetime.now().strftime('%d:%m:%y')
-                    now_ste = datetime.now().strftime('%H:%M:%S')
+                    now_str = now.strftime('%d:%m:%y')
+                    now_time = now.strftime('%H:%M:%S')
                     last_m = f"{last_rate:.4f}"
+                    
                     # ส่งข้อความพร้อมการตกแต่ง
                     message = (
                                 f">>> ```css"
@@ -72,6 +74,7 @@ async def send_exchange_rate():
                             )
 
                     await channel.send(message)
+
                 except Exception as e:
                     await channel.send(f"เกิดข้อผิดพลาดในการดึงข้อมูลค่าเงิน: {str(e)}")
 
@@ -83,7 +86,10 @@ async def send_exchange_rate():
 @client.event
 async def on_ready():
     print(f'บอท {client.user} เข้าสู่ระบบแล้ว!')
+    client.loop.create_task(send_exchange_rate())
+    server_on()
 
+client.run(os.getenv('TOKEN'))
     client.loop.create_task(send_exchange_rate())
 
     server_on()
