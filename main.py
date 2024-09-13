@@ -65,7 +65,7 @@ async def send_exchange_rate():
                                 f"\n{'⏰เวลา'.center(32)}"
                                 f"\n{day_of_week_th.center(37)}"
                                 f"\n{now_str.center(33)}"
-                                f"\n{now_ste.center(33)}"
+                                f"\n{now_time.center(33)}"
                                 f"\n{'💵 อัตรา'.center(33)}"
                                 f"\n{last_m.center(33)}"
                                 f"\n{'บาท/USD'.center(33)}"
